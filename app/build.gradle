@@ -1,0 +1,216 @@
+buildscript {
+    repositories {
+        maven { url 'https://maven.fabric.io/public' }
+    }
+
+    dependencies {
+        classpath 'io.fabric.tools:gradle:1.25.1'
+    }
+}
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'io.fabric'
+apply plugin: 'com.github.triplet.play'
+apply plugin: 'com.google.firebase.firebase-perf'
+apply plugin: 'kotlin-kapt'
+
+repositories {
+    maven { url 'https://maven.fabric.io/public' }
+    mavenCentral()
+}
+
+
+
+android {
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    buildToolsVersion '27.0.3'
+
+    defaultConfig {
+        applicationId "org.bookdash.android"
+        minSdkVersion 16
+        targetSdkVersion rootProject.ext.compileSdkVersion
+        versionCode rootProject.ext.versionCode
+        versionName "$rootProject.ext.versionName"
+        testInstrumentationRunner "org.bookdash.android.presentation.CustomTestRunner"
+        resConfigs "en"
+        vectorDrawables.useSupportLibrary = true
+
+    }
+    dataBinding {
+        enabled = true
+    }
+
+
+    File signFile = rootProject.file('release-keystore.properties')
+    if (signFile.exists()) {
+        signingConfigs {
+            release {
+                def props = new Properties()
+
+                props.load(new FileInputStream(signFile))
+
+                storeFile rootProject.file(props.keyStore)
+                storePassword props.keyStorePassword
+                keyAlias props.keyAlias
+                keyPassword props.keyAliasPassword
+            }
+        }
+        buildTypes.release.signingConfig signingConfigs.release
+
+    }
+
+    packagingOptions {
+        exclude 'META-INF/ASL2.0'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/license.txt'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/notice.txt'
+
+        exclude 'META-INF/maven/com.google.guava/guava/pom.properties'
+        exclude 'META-INF/maven/com.google.guava/guava/pom.xml'
+        exclude 'LICENSE.txt'
+    }
+    flavorDimensions "env"
+    productFlavors {
+        mock {
+            dimension "env"
+            applicationIdSuffix ".qa"
+        }
+        qa {
+            dimension "env"
+            applicationIdSuffix ".qa"
+        }
+        prod {
+            dimension "env"
+        }
+    }
+    // Remove mockRelease as it's not needed.
+    android.variantFilter { variant ->
+        if (variant.buildType.name.equals('release')
+                && variant.getFlavors().get(0).name.equals('mock')) {
+            variant.setIgnore(true)
+        }
+    }
+    // Always show the result of every unit test, even if it passes.
+    testOptions.unitTests.all {
+        testLogging {
+            events 'passed', 'skipped', 'failed', 'standardOut', 'standardError'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            ext.enableCrashlytics = true
+        }
+        debug {
+            ext.enableCrashlytics = false
+            // Run code coverage reports by default on debug builds.
+            testCoverageEnabled = true
+        }
+    }
+
+    play {
+        jsonFile = rootProject.file('google-play-keys.json')
+        track = "${track}"
+    }
+}
+dependencies {
+
+    testImplementation "junit:junit:$rootProject.ext.junitVersion"
+    testImplementation "org.mockito:mockito-all:$rootProject.ext.mockitoVersion"
+    testImplementation "org.hamcrest:hamcrest-all:$rootProject.ext.hamcrestVersion"
+    testImplementation("org.powermock:powermock-module-junit4:$rootProject.ext.powerMockito")
+    testImplementation("org.powermock:powermock-api-mockito:$rootProject.ext.powerMockito")
+
+    // Android Testing Support Library's runner and rules
+    androidTestImplementation('com.android.support.test.espresso:espresso-web:2.2.1') {
+        exclude module: 'support-annotations'
+        exclude module: 'support-v4'
+    }
+    androidTestImplementation("com.android.support.test:runner:$rootProject.ext.runnerVersion") {
+        exclude module: 'support-annotations'
+        exclude module: 'support-v4'
+    }
+    androidTestImplementation("com.android.support.test:rules:$rootProject.ext.runnerVersion") {
+        exclude module: 'support-annotations'
+        exclude module: 'support-v4'
+    }
+
+    // Espresso UI Testing
+    androidTestImplementation("com.android.support.test.espresso:espresso-core:$rootProject.ext.espressoVersion") {
+        exclude module: 'recyclerview-v7'
+        exclude module: 'support-annotations'
+        exclude module: 'support-v4'
+        exclude group: "javax.inject"
+
+    }
+    androidTestImplementation("com.android.support.test.espresso:espresso-contrib:$rootProject.ext.espressoVersion") {
+        exclude module: 'support-annotations'
+        exclude group: 'com.android.support', module: 'appcompat'
+        exclude group: 'com.android.support', module: 'support-v4'
+        exclude module: 'recyclerview-v7'
+    }
+    androidTestImplementation("com.android.support.test.espresso:espresso-intents:$rootProject.ext.espressoVersion") {
+        exclude module: 'recyclerview-v7'
+        exclude module: 'support-annotations'
+        exclude module: 'support-v4'
+    }
+    androidTestImplementation "com.android.support:appcompat-v7:$rootProject.ext.supportLibraryVersion"
+    androidTestImplementation "com.android.support:design:$rootProject.ext.supportLibraryVersion"
+
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation project(':fabbutton')
+
+    implementation "com.android.support:appcompat-v7:$rootProject.ext.supportLibraryVersion"
+    implementation "com.android.support:cardview-v7:$rootProject.ext.supportLibraryVersion"
+    implementation "com.android.support:palette-v7:$rootProject.ext.supportLibraryVersion"
+    implementation "com.android.support:design:$rootProject.ext.supportLibraryVersion"
+    implementation "com.android.support:recyclerview-v7:$rootProject.ext.supportLibraryVersion"
+    implementation "com.android.support:percent:$rootProject.ext.supportLibraryVersion"
+    implementation "com.android.support:preference-v7:$rootProject.ext.supportLibraryVersion"
+    implementation "com.android.support:preference-v14:$rootProject.ext.supportLibraryVersion"
+    implementation 'com.github.bumptech.glide:glide:3.8.0'
+    implementation 'com.google.code.gson:gson:2.8.2'
+    implementation 'com.github.castorflex.smoothprogressbar:library-circular:1.2.0'
+
+    implementation('com.crashlytics.sdk.android:crashlytics:2.5.3@aar') {
+        transitive = true
+    }
+    implementation('za.co.riggaroo:materialhelptutorial:1.6.0') {
+        exclude module: 'support-v4'
+    }
+
+    implementation("com.google.firebase:firebase-invites:${rootProject.ext.googlePlayServicesVersion}") {
+        exclude module: 'support-v4'
+    }
+    implementation("com.google.firebase:firebase-core:${rootProject.ext.googlePlayServicesVersion}") {
+        exclude module: 'support-v4'
+    }
+    implementation "com.google.firebase:firebase-database:${rootProject.ext.googlePlayServicesVersion}"
+    implementation "com.google.firebase:firebase-messaging:${rootProject.ext.googlePlayServicesVersion}"
+    implementation("com.google.firebase:firebase-config:${rootProject.ext.googlePlayServicesVersion}") {
+        exclude module: 'support-v4'
+    }
+    implementation("com.google.firebase:firebase-storage:${rootProject.ext.googlePlayServicesVersion}") {
+        exclude module: 'support-v4'
+    }
+    implementation('com.firebaseui:firebase-ui-storage:0.6.1') {
+        exclude module: 'support-v4'
+    }
+    implementation "com.google.firebase:firebase-perf:${rootProject.ext.googlePlayServicesVersion}"
+
+    implementation 'io.reactivex:rxandroid:1.2.1'
+    implementation 'io.reactivex:rxjava:1.2.5'
+    implementation 'com.jakewharton.threetenabp:threetenabp:1.0.5'
+    implementation 'com.jakewharton.timber:timber:4.6.0'
+    implementation 'com.android.support.constraint:constraint-layout:1.1.0-beta5'
+    implementation "android.arch.lifecycle:extensions:1.1.0"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+}
+
+
+apply plugin: 'com.google.gms.google-services'
